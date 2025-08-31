@@ -1,0 +1,191 @@
+name: CI - Testes Unificados (Android e iOS) com Appium
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  android_tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Setup Node.js v18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: AVD cache
+        id: avd-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-${{ runner.os }}-api-28
+
+      - name: Check AVD cache hit
+        run: 'echo "AVD Cache Hit: ${{ steps.avd-cache.outputs.cache-hit }}"'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Nota: A inicialização manual do Appium aqui é necessária se o seu wdio.android.conf.js não usar o @wdio/appium-service.
+      # Se usar, remova este passo também para o Android.
+      - name: Start Appium (in background)
+        run: npx appium &
+
+      - name: Create AVD and generate snapshot for caching
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 28
+          target: google_apis
+          arch: x86
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "Generated AVD snapshot for caching."
+
+      - name: Run Android Emulator and Tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 28
+          arch: x86
+          target: google_apis
+          emulator-options: "-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none"
+          disable-animations: true
+          script: npm run test:android
+
+      - name: Upload Android Allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-android
+          path: allure-results
+          retention-days: 7
+
+  ios_tests:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Cache Node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+      - name: Setup Node.js v18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run and Wait for iOS Simulator
+        timeout-minutes: 5
+        run: |
+          echo "Procurando por um simulador de iPhone disponível..."
+          # ... (lógica para encontrar o DEVICE_UDID continua a mesma) ...
+          DEVICE_UDID=$(xcrun simctl list devices available | grep 'iPhone 14' | head -n 1 | awk -F'[()]' '{print $2}')
+          if [ -z "$DEVICE_UDID" ]; then
+            echo "Nenhum simulador de iPhone 14 disponível foi encontrado. Tentando qualquer iPhone."
+            DEVICE_UDID=$(xcrun simctl list devices available | grep 'iPhone' | head -n 1 | awk -F'[()]' '{print $2}')
+          fi
+
+          # --- ADICIONE ESTA LINHA ---
+          echo "DEVICE_UDID=$DEVICE_UDID" >> $GITHUB_ENV
+          # ---------------------------
+
+          if [ -z "$DEVICE_UDID" ]; then
+            echo "Nenhum simulador de iPhone disponível foi encontrado."
+            exit 1
+          fi
+          echo "Iniciando simulador com UDID: $DEVICE_UDID"
+          xcrun simctl boot "$DEVICE_UDID"
+          echo "Aguardando o simulador (UDID: $DEVICE_UDID) ficar pronto..."
+          TIMEOUT=300; START_TIME=$(date +%s)
+          while true; do
+            if xcrun simctl list devices | grep "$DEVICE_UDID" | grep -q "Booted"; then
+              echo "Simulador está pronto!"; break
+            fi
+            CURRENT_TIME=$(date +%s); ELAPSED_TIME=$((CURRENT_TIME - START_TIME))
+            if [ $ELAPSED_TIME -ge $TIMEOUT ]; then
+              echo "Erro: Tempo de espera esgotado."; xcrun simctl list devices; exit 1
+            fi
+            sleep 5
+          done
+      - name: Allow Simulator to Settle
+        run: |
+          echo "Dando 20 segundos para o simulador se estabilizar..."
+          sleep 20
+      - name: Run iOS tests
+        run: npm run test:ios
+
+      # - name: DEBUG - Start Appium Manually to See Logs
+      #   run: npx appium --address 127.0.0.1 --port 4723
+
+      - name: Upload iOS Allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-ios
+          path: allure-results
+          retention-days: 7
+          
+  generate_report:
+    runs-on: ubuntu-latest
+    needs: [android_tests, ios_tests]
+    if: always()
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Download Android Allure results
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-results-android
+          path: allure-results-android
+      - name: Download iOS Allure results
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-results-ios
+          path: allure-results-ios
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install Allure Commandline
+        run: npm install -g allure-commandline
+
+      - name: Generate Allure Report
+        run: |
+          mkdir -p allure-results
+          allure generate allure-results --clean -o allure-report
+      - name: Upload Allure Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: allure-report
