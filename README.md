@@ -93,12 +93,12 @@ Após a execução dos testes, os resultados serão guardados na pasta `allure-r
 
 **1. Gerar o Relatório**
 ```bash
-allure generate allure-results --clean
+npm run report:generate
 ```
 
 **2. Abrir o Relatório**
 ```bash
-allure open
+npm run report:open
 ```
 > Este comando irá abrir o relatório no seu navegador padrão.
 
