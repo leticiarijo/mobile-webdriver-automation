@@ -23,10 +23,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
 
-      - name: Setup Node.js v20
+      - name: Setup Node.js v18
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'
 
       - name: Enable KVM
         run: |
@@ -107,6 +107,20 @@ jobs:
 
       - name: Run and Wait for iOS Simulator
         timeout-minutes: 5
+        # run: |
+        #   echo "Procurando por um simulador de iPhone disponível..."
+        #   # Usamos 'iPhone 14' como exemplo, pois é mais garantido de estar disponível nos runners do GitHub.
+        #   # Pode ajustar para um modelo específico que precise, mas confirme a sua disponibilidade.
+        #   DEVICE_UDID=$(xcrun simctl list devices available | grep 'iPhone 14' | head -n 1 | awk -F'[()]' '{print $2}')
+        #   if [ -z "$DEVICE_UDID" ]; then
+        #     echo "Nenhum simulador de iPhone 14 disponível foi encontrado. Tentando qualquer iPhone."
+        #     DEVICE_UDID=$(xcrun simctl list devices available | grep 'iPhone' | head -n 1 | awk -F'[()]' '{print $2}')
+        #   fi
+        #   if [ -z "$DEVICE_UDID" ]; then
+        #     echo "Nenhum simulador de iPhone disponível foi encontrado."
+        #     exit 1
+        #   fi
+        #   echo "Iniciando simulador com UDID: $DEVICE_UDID"
         run: |
           echo "Procurando por um simulador de iPhone disponível..."
           # ... (lógica para encontrar o DEVICE_UDID continua a mesma) ...
