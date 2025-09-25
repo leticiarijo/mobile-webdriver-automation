@@ -49,8 +49,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Nota: A inicialização manual do Appium aqui é necessária se o seu wdio.android.conf.js não usar o @wdio/appium-service.
-      # Se usar, remova este passo também para o Android.
       - name: Start Appium (in background)
         run: npx appium &
 
@@ -172,12 +170,24 @@ jobs:
       - name: Install Allure Commandline
         run: npm install -g allure-commandline
 
-      - name: Generate Allure Report
-        run: |
-          mkdir -p allure-results
-          allure generate allure-results --clean -o allure-report
-      - name: Upload Allure Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: allure-report
-          path: allure-report
+    # === Allure Report Android ===
+    - name: Generate Allure Report (Android)
+      run: |
+        allure generate allure-results-android --clean -o allure-report-android
+
+    - name: Upload Allure Report (Android)
+      uses: actions/upload-artifact@v4
+      with:
+        name: allure-report-android
+        path: allure-report-android
+
+    # === Allure Report iOS ===
+    - name: Generate Allure Report (iOS)
+      run: |
+        allure generate allure-results-ios --clean -o allure-report-ios
+
+    - name: Upload Allure Report (iOS)
+      uses: actions/upload-artifact@v4
+      with:
+        name: allure-report-ios
+        path: allure-report-ios
