@@ -170,24 +170,22 @@ jobs:
       - name: Install Allure Commandline
         run: npm install -g allure-commandline
 
-    # === Allure Report Android ===
-    - name: Generate Allure Report (Android)
-      run: |
-        allure generate allure-results-android --clean -o allure-report-android
+      - name: Generate Allure Report (Android)
+        run: |
+          allure generate allure-results-android --clean -o allure-report-android
 
-    - name: Upload Allure Report (Android)
-      uses: actions/upload-artifact@v4
-      with:
-        name: allure-report-android
-        path: allure-report-android
+      - name: Upload Allure Report (Android)
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-android
+          path: allure-report-android
 
-    # === Allure Report iOS ===
-    - name: Generate Allure Report (iOS)
-      run: |
-        allure generate allure-results-ios --clean -o allure-report-ios
+      - name: Generate Allure Report (iOS)
+        run: |
+          allure generate allure-results-ios --clean -o allure-report-ios
 
-    - name: Upload Allure Report (iOS)
-      uses: actions/upload-artifact@v4
-      with:
-        name: allure-report-ios
-        path: allure-report-ios
+      - name: Upload Allure Report (iOS)
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-ios
+          path: allure-report-ios
